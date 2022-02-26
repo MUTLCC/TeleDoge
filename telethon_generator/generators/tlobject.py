@@ -252,36 +252,41 @@ def _write_class_init(tlobject, kind, type_constructors, builder):
 
 
 def _write_resolve(tlobject, builder):
-    if tlobject.is_function and any(
-            (arg.type in AUTO_CASTS
-             or ((arg.name, arg.type) in NAMED_AUTO_CASTS
-                 and tlobject.fullname not in NAMED_BLACKLIST))
-            for arg in tlobject.real_args
+    if not tlobject.is_function or not any(
+        (
+            arg.type in AUTO_CASTS
+            or (
+                (arg.name, arg.type) in NAMED_AUTO_CASTS
+                and tlobject.fullname not in NAMED_BLACKLIST
+            )
+        )
+        for arg in tlobject.real_args
     ):
-        builder.writeln('async def resolve(self, client, utils):')
-        for arg in tlobject.real_args:
-            ac = AUTO_CASTS.get(arg.type)
-            if not ac:
-                ac = NAMED_AUTO_CASTS.get((arg.name, arg.type))
-                if not ac:
-                    continue
+        return
 
-            if arg.is_flag:
-                builder.writeln('if self.{}:', arg.name)
+    builder.writeln('async def resolve(self, client, utils):')
+    for arg in tlobject.real_args:
+        ac = AUTO_CASTS.get(arg.type)
+        if not ac:
+            ac = NAMED_AUTO_CASTS.get((arg.name, arg.type))
+        if not ac:
+            continue
 
-            if arg.is_vector:
-                builder.writeln('_tmp = []')
-                builder.writeln('for _x in self.{0}:', arg.name)
-                builder.writeln('_tmp.append({})', ac.format('_x'))
-                builder.end_block()
-                builder.writeln('self.{} = _tmp', arg.name)
-            else:
-                builder.writeln('self.{} = {}', arg.name,
-                              ac.format('self.' + arg.name))
+        if arg.is_flag:
+            builder.writeln('if self.{}:', arg.name)
 
-            if arg.is_flag:
-                builder.end_block()
-        builder.end_block()
+        if arg.is_vector:
+            builder.writeln('_tmp = []')
+            builder.writeln('for _x in self.{0}:', arg.name)
+            builder.writeln('_tmp.append({})', ac.format('_x'))
+            builder.end_block()
+            builder.writeln('self.{} = _tmp', arg.name)
+        else:
+            builder.writeln('self.{} = {}', arg.name, ac.format(f'self.{arg.name}'))
+
+        if arg.is_flag:
+            builder.end_block()
+    builder.end_block()
 
 
 def _write_to_dict(tlobject, builder):
@@ -299,19 +304,18 @@ def _write_to_dict(tlobject, builder):
                               arg.name)
             else:
                 builder.write('self.{}', arg.name)
+        elif arg.is_vector:
+            builder.write(
+                '[] if self.{0} is None else [x.to_dict() '
+                'if isinstance(x, TLObject) else x for x in self.{0}]',
+                arg.name
+            )
         else:
-            if arg.is_vector:
-                builder.write(
-                    '[] if self.{0} is None else [x.to_dict() '
-                    'if isinstance(x, TLObject) else x for x in self.{0}]',
-                    arg.name
-                )
-            else:
-                builder.write(
-                    'self.{0}.to_dict() '
-                    'if isinstance(self.{0}, TLObject) else self.{0}',
-                    arg.name
-                )
+            builder.write(
+                'self.{0}.to_dict() '
+                'if isinstance(self.{0}, TLObject) else self.{0}',
+                arg.name
+            )
 
     builder.writeln()
     builder.current_indent -= 1
@@ -362,7 +366,7 @@ def _write_from_reader(tlobject, builder):
     builder.writeln('@classmethod')
     builder.writeln('def from_reader(cls, reader):')
     for arg in tlobject.args:
-        _write_arg_read_code(builder, arg, tlobject, name='_' + arg.name)
+        _write_arg_read_code(builder, arg, tlobject, name=f'_{arg.name}')
 
     builder.writeln('return cls({})', ', '.join(
         '{0}=_{0}'.format(a.name) for a in tlobject.real_args))
@@ -549,7 +553,7 @@ def _write_arg_read_code(builder, arg, tlobject, name):
     if arg.is_flag:
         # Treat 'true' flags as a special case, since they're true if
         # they're set, and nothing else needs to actually be read.
-        if 'true' == arg.type:
+        if arg.type == 'true':
             builder.writeln('{} = bool(flags & {})',
                             name, 1 << arg.flag_index)
             return
@@ -578,7 +582,7 @@ def _write_arg_read_code(builder, arg, tlobject, name):
         builder.writeln('flags = reader.read_int()')
         builder.writeln()
 
-    elif 'int' == arg.type:
+    elif arg.type == 'int':
         # User IDs are becoming larger than 2³¹ - 1, which would translate
         # into reading a negative ID, which we would treat as a chat. So
         # special case them to read unsigned. See https://t.me/BotNews/57.
@@ -587,57 +591,55 @@ def _write_arg_read_code(builder, arg, tlobject, name):
         else:
             builder.writeln('{} = reader.read_int()', name)
 
-    elif 'long' == arg.type:
+    elif arg.type == 'long':
         builder.writeln('{} = reader.read_long()', name)
 
-    elif 'int128' == arg.type:
+    elif arg.type == 'int128':
         builder.writeln('{} = reader.read_large_int(bits=128)', name)
 
-    elif 'int256' == arg.type:
+    elif arg.type == 'int256':
         builder.writeln('{} = reader.read_large_int(bits=256)', name)
 
-    elif 'double' == arg.type:
+    elif arg.type == 'double':
         builder.writeln('{} = reader.read_double()', name)
 
-    elif 'string' == arg.type:
+    elif arg.type == 'string':
         builder.writeln('{} = reader.tgread_string()', name)
 
-    elif 'Bool' == arg.type:
+    elif arg.type == 'Bool':
         builder.writeln('{} = reader.tgread_bool()', name)
 
-    elif 'true' == arg.type:
+    elif arg.type == 'true':
         # Arbitrary not-None value, don't actually read "true" flags
         builder.writeln('{} = True', name)
 
-    elif 'bytes' == arg.type:
+    elif arg.type == 'bytes':
         builder.writeln('{} = reader.tgread_bytes()', name)
 
-    elif 'date' == arg.type:  # Custom format
+    elif arg.type == 'date':  # Custom format
         builder.writeln('{} = reader.tgread_date()', name)
 
+    elif not arg.skip_constructor_id:
+        builder.writeln('{} = reader.tgread_object()', name)
     else:
-        # Else it may be a custom type
-        if not arg.skip_constructor_id:
-            builder.writeln('{} = reader.tgread_object()', name)
+        # Import the correct type inline to avoid cyclic imports.
+        # There may be better solutions so that we can just access
+        # all the types before the files have been parsed, but I
+        # don't know of any.
+        sep_index = arg.type.find('.')
+        if sep_index == -1:
+            ns, t = '.', arg.type
         else:
-            # Import the correct type inline to avoid cyclic imports.
-            # There may be better solutions so that we can just access
-            # all the types before the files have been parsed, but I
-            # don't know of any.
-            sep_index = arg.type.find('.')
-            if sep_index == -1:
-                ns, t = '.', arg.type
-            else:
-                ns, t = '.' + arg.type[:sep_index], arg.type[sep_index+1:]
-            class_name = snake_to_camel_case(t)
+            ns, t = f'.{arg.type[:sep_index]}', arg.type[sep_index+1:]
+        class_name = snake_to_camel_case(t)
 
-            # There would be no need to import the type if we're in the
-            # file with the same namespace, but since it does no harm
-            # and we don't have information about such thing in the
-            # method we just ignore that case.
-            builder.writeln('from {} import {}', ns, class_name)
-            builder.writeln('{} = {}.from_reader(reader)',
-                            name, class_name)
+        # There would be no need to import the type if we're in the
+        # file with the same namespace, but since it does no harm
+        # and we don't have information about such thing in the
+        # method we just ignore that case.
+        builder.writeln('from {} import {}', ns, class_name)
+        builder.writeln('{} = {}.from_reader(reader)',
+                        name, class_name)
 
     # End vector and flag blocks if required (if we opened them before)
     if arg.is_vector:

@@ -87,12 +87,11 @@ class MessageParseMethods:
         message, msg_entities = parse_mode.parse(message)
         if original_message and not message and not msg_entities:
             raise ValueError("Failed to parse message")
-        
+
         for i in reversed(range(len(msg_entities))):
             e = msg_entities[i]
             if isinstance(e, types.MessageEntityTextUrl):
-                m = re.match(r'^@|\+|tg://user\?id=(\d+)', e.url)
-                if m:
+                if m := re.match(r'^@|\+|tg://user\?id=(\d+)', e.url):
                     user = int(m.group(1)) if m.group(1) else e.url
                     is_mention = await self._replace_with_mention(msg_entities, i, user)
                     if not is_mention:

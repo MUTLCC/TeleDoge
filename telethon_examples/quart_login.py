@@ -9,9 +9,7 @@ from telethon.errors import SessionPasswordNeededError
 
 
 def get_env(name, message):
-    if name in os.environ:
-        return os.environ[name]
-    return input(message)
+    return os.environ[name] if name in os.environ else input(message)
 
 
 BASE_TEMPLATE = '''

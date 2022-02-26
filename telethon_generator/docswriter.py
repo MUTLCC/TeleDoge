@@ -177,21 +177,20 @@ class DocsWriter:
         if tlobject.result == generic_name:
             # Generic results cannot have any link
             self.write(tlobject.result)
-        else:
-            if re.search('^vector<', tlobject.result, re.IGNORECASE):
-                # Notice that we don't simply make up the "Vector" part,
-                # because some requests (as of now, only FutureSalts),
-                # use a lower type name for it (see #81)
-                vector, inner = tlobject.result.split('<')
-                inner = inner.strip('>')
-                self.write('<a href="{}">{}</a>&lt;',
-                           self.type_to_path(vector), vector)
+        elif re.search('^vector<', tlobject.result, re.IGNORECASE):
+            # Notice that we don't simply make up the "Vector" part,
+            # because some requests (as of now, only FutureSalts),
+            # use a lower type name for it (see #81)
+            vector, inner = tlobject.result.split('<')
+            inner = inner.strip('>')
+            self.write('<a href="{}">{}</a>&lt;',
+                       self.type_to_path(vector), vector)
 
-                self.write('<a href="{}">{}</a>&gt;',
-                           self.type_to_path(inner), inner)
-            else:
-                self.write('<a href="{}">{}</a>',
-                           self.type_to_path(tlobject.result), tlobject.result)
+            self.write('<a href="{}">{}</a>&gt;',
+                       self.type_to_path(inner), inner)
+        else:
+            self.write('<a href="{}">{}</a>',
+                       self.type_to_path(tlobject.result), tlobject.result)
 
         self.write('</pre>')
 

@@ -122,20 +122,13 @@ class TLArg:
             # Strip the exclamation mark always to have only the name
             self.type = arg_type.lstrip('!')
 
-            # The type may be a flag (flags.IDX?REAL_TYPE)
-            # Note that 'flags' is NOT the flags name; this
-            # is determined by a previous argument
-            # However, we assume that the argument will always be called 'flags'
-            flag_match = re.match(r'flags.(\d+)\?([\w<>.]+)', self.type)
-            if flag_match:
+            if flag_match := re.match(r'flags.(\d+)\?([\w<>.]+)', self.type):
                 self.is_flag = True
                 self.flag_index = int(flag_match.group(1))
                 # Update the type to match the exact type, not the "flagged" one
                 self.type = flag_match.group(2)
 
-            # Then check if the type is a Vector<REAL_TYPE>
-            vector_match = re.match(r'[Vv]ector<([\w\d.]+)>', self.type)
-            if vector_match:
+            if vector_match := re.match(r'[Vv]ector<([\w\d.]+)>', self.type):
                 self.is_vector = True
 
                 # If the type's first letter is not uppercase, then
@@ -186,11 +179,7 @@ class TLArg:
         return result
 
     def real_type(self):
-        # Find the real type representation by updating it as required
-        real_type = self.type
-        if self.flag_indicator:
-            real_type = '#'
-
+        real_type = '#' if self.flag_indicator else self.type
         if self.is_vector:
             if self.use_vector_id:
                 real_type = 'Vector<{}>'.format(real_type)
@@ -225,14 +214,15 @@ class TLArg:
             f.write('other_request')
             return
 
-        known = (KNOWN_NAMED_EXAMPLES.get((self.name, self.type))
-                 or KNOWN_TYPED_EXAMPLES.get(self.type)
-                 or KNOWN_TYPED_EXAMPLES.get(SYNONYMS.get(self.type)))
-        if known:
+        if known := (
+            KNOWN_NAMED_EXAMPLES.get((self.name, self.type))
+            or KNOWN_TYPED_EXAMPLES.get(self.type)
+            or KNOWN_TYPED_EXAMPLES.get(SYNONYMS.get(self.type))
+        ):
             f.write(known)
             return
 
-        assert self.omit_example() or self.cls, 'TODO handle ' + str(self)
+        assert self.omit_example() or self.cls, f'TODO handle {str(self)}'
 
         # Pick an interesting example if any
         for cls in self.cls:

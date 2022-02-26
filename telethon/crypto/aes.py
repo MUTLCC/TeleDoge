@@ -81,10 +81,9 @@ class AES:
         Encrypts the given text in 16-bytes blocks by using the
         given key and 32-bytes initialization vector.
         """
-        padding = len(plain_text) % 16
-        if padding:
+        if padding := len(plain_text) % 16:
             plain_text += os.urandom(16 - padding)
-        
+
         if tgcrypto:
             return tgcrypto.ige256_encrypt(plain_text, key, iv)
         if cryptg:

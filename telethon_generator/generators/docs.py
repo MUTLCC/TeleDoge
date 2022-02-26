@@ -29,7 +29,7 @@ def _get_file_name(tlobject):
 def get_import_code(tlobject):
     """``TLObject -> from ... import ...``."""
     kind = 'functions' if tlobject.is_function else 'types'
-    ns = '.' + tlobject.namespace if tlobject.namespace else ''
+    ns = f'.{tlobject.namespace}' if tlobject.namespace else ''
     return 'from telethon.tl.{}{} import {}'\
         .format(kind, ns, tlobject.class_name)
 
@@ -131,9 +131,11 @@ def _generate_index(folder, paths,
                 # For every namespace, also write the index of it
                 namespace_paths = []
                 if bots_index:
-                    for item in bots_index_paths:
-                        if item.parent == namespace:
-                            namespace_paths.append(item)
+                    namespace_paths.extend(
+                        item
+                        for item in bots_index_paths
+                        if item.parent == namespace
+                    )
 
                 _generate_index(namespace, paths,
                                 bots_index, namespace_paths)

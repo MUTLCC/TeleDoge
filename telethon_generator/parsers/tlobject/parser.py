@@ -58,8 +58,7 @@ def _from_line(line, is_function, method_info, layer):
     )
 
     name = match.group(1)
-    method_info = method_info.get(name)
-    if method_info:
+    if method_info := method_info.get(name):
         usability = method_info.usability
         friendly = method_info.friendly
     else:
@@ -101,8 +100,7 @@ def parse_tl(file_path, layer, methods=None, ignored_ids=CORE_TYPES):
             if not line:
                 continue
 
-            match = re.match(r'---(\w+)---', line)
-            if match:
+            if match := re.match(r'---(\w+)---', line):
                 following_types = match.group(1)
                 is_function = following_types == 'functions'
                 continue
@@ -143,6 +141,5 @@ def find_layer(file_path):
     layer_regex = re.compile(r'^//\s*LAYER\s*(\d+)$')
     with file_path.open('r') as file:
         for line in file:
-            match = layer_regex.match(line)
-            if match:
+            if match := layer_regex.match(line):
                 return int(match.group(1))
